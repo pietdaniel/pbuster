@@ -1,7 +1,7 @@
 # pbuster
 ### A simple CLI directory brute forcer
 
-Usage: -t hostname -f dictionary
+Usage: ./bust -t hostname -f dictionary
 
 ```
 Options:
