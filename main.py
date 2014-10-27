@@ -1,4 +1,4 @@
-import requests, itertools, sys
+import requests, itertools, sys, re
 from multiprocessing import Pool
 from optparse import OptionParser
 
@@ -6,16 +6,33 @@ def run(parser):
     """
         kicks off the show
     """
-    options = get_options(parser)
 
+    options = check_options(parser)
+    options.base_url = get_base_url(options)
     urls = get_urls(options)
+
+    mprint("Starting buster with base url " + options.base_url)
 
     if options.parallel > 1:
         p = Pool(options.parallel)
-        p.map(make_request, urls)
+        p.map(make_request, add_ext(urls,options))
     else: 
-        for url in urls:
+        for url in add_ext(urls,options):
             make_request(url)
+
+
+def add_ext(urls, options):
+    """
+        generator which yields urls
+        appended with the appropriate extensions
+    """ 
+    ctr = 0
+    while ctr < len(urls):
+        for ext in options.extensions:
+            output = urls[ctr] + '.' + ext
+            yield output
+        ctr += 1
+
 
 def init_parser():
     """
@@ -60,12 +77,11 @@ def parse_extensions(options, opt, value, parser):
         setattr(parser.values, options.dest, args)
 
 
-def get_options(parser):
+def check_options(parser):
     """
         Error checking, returns the appropriate options
     """
     (options, args) = parser.parse_args()
-    options.mutli_test=False
 
     if not options.filename:
         parser.error("Filename required for dictionary file")
@@ -74,7 +90,6 @@ def get_options(parser):
         if len(args) == 0:
             parser.error("Target required")
         else:
-            options.mutli_test=True
             options.target=args[0]
 
     return options
@@ -91,17 +106,38 @@ def get_urls(options):
     urls = []
     for line in filename.readlines():
         line = line.replace("\n","")
-        if len(line) > 0:
-            url = "http://" + options.target + ":" + str(options.port) + "/" + line 
+        if len(line) > 0 and line[0] != "#":
+            url = options.base_url + line
             urls.append(url)
 
-    new_urls = []
-    for ext in options.extensions:
-        for url in urls:
-            new_urls.append(url + "." + ext)
-    urls = new_urls + urls
-
     return urls
+
+def get_base_url(options):
+    """
+      constructs the base uri to test
+    """
+    protocols = ["http://","https://"]
+
+    # check if any protocols are currently in the target
+    if any(map(lambda x: (x in options.target), protocols)):
+        base_url = options.target
+    else:
+        base_url = "http://" + options.target
+
+
+    # check if ports are in the target
+    m = re.search(":[0-9]*", options.target)
+    if m is None:
+        base_url = base_url + ":" + str(options.port) 
+
+    base_url = base_url + "/"
+
+    return base_url
+
+
+def mprint(text):
+    sys.stdout.write(text)
+
 
 def pprint(response, url):
     """

@@ -17,3 +17,12 @@ Options:
                         extension to append to the wordlist, format is
                         -e=php,js,html
 ```
+
+TODO:
+  -http https
+  -extensions
+  -rate limiting
+  -comments in dicts
+  -dictionaries
+
+
