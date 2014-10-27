@@ -19,10 +19,6 @@ Options:
 ```
 
 TODO:
-  -http https
-  -extensions
   -rate limiting
-  -comments in dicts
-  -dictionaries
 
-
+Usage: -t hostname -f dictionary

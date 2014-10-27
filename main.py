@@ -1,4 +1,5 @@
-import requests, itertools, sys, re
+import requests, itertools, sys, re, select, os
+from time import time
 from multiprocessing import Pool
 from optparse import OptionParser
 
@@ -6,33 +7,49 @@ def run(parser):
     """
         kicks off the show
     """
+    t1 = time()
 
     options = check_options(parser)
-    options.base_url = get_base_url(options)
-    urls = get_urls(options)
 
-    mprint("Starting buster with base url " + options.base_url)
+    mprint("Starting buster with base url " + options.base_url + "\r\n")
+
+    urls = get_urls(options)
+    urls = url_gen(urls, options)
+
 
     if options.parallel > 1:
         p = Pool(options.parallel)
-        p.map(make_request, add_ext(urls,options))
+        p.map(make_request, urls)
     else: 
-        for url in add_ext(urls,options):
+        for url in urls:
             make_request(url)
 
+    mprint("Finished checking %d sites in %f seconds" % (options.count, (time() - t1)))
+    mprint("\r\n")
 
-def add_ext(urls, options):
+def url_gen(urls, options):
     """
-        generator which yields urls
-        appended with the appropriate extensions
+        generator which yields urls appended 
+        with the appropriate extensions
     """ 
     ctr = 0
+    t1=time()
     while ctr < len(urls):
         for ext in options.extensions:
+            key_handler(ctr,t1)
+            options.count += 1
             output = urls[ctr] + '.' + ext
             yield output
         ctr += 1
 
+def key_handler(ctr,t1):
+    """
+        Prints status on keystroke
+    """
+    if sys.stdin in select.select([sys.stdin], [], [], 0)[0] and not dont:
+        mprint("\rTotal scanned %d in %f seconds" % (ctr, (time() - t1)))
+        sys.stdin.readline()
+        sys.stdin.flush()
 
 def init_parser():
     """
@@ -80,6 +97,7 @@ def parse_extensions(options, opt, value, parser):
 def check_options(parser):
     """
         Error checking, returns the appropriate options
+        adds request count and base url options
     """
     (options, args) = parser.parse_args()
 
@@ -91,6 +109,10 @@ def check_options(parser):
             parser.error("Target required")
         else:
             options.target=args[0]
+
+    options.count = 0
+
+    options.base_url = get_base_url(options)
 
     return options
 
@@ -126,7 +148,7 @@ def get_base_url(options):
 
 
     # check if ports are in the target
-    m = re.search(":[0-9]*", options.target)
+    m = re.search(":[0-9]+", options.target)
     if m is None:
         base_url = base_url + ":" + str(options.port) 
 
@@ -136,7 +158,7 @@ def get_base_url(options):
 
 
 def mprint(text):
-    sys.stdout.write(text)
+    sys.stdout.write(str(text))
 
 
 def pprint(response, url):
@@ -157,7 +179,15 @@ def make_request(url):
         Checks the url for existence
     """
     try:
-        r = (True, requests.get(url))
+        headers = {
+          'User-Agent': 'Mozilla/5.0 Gecko/20100101 Firefox/32.0',
+          'Accept':'*/*',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate',
+          'Connection':'keep-alive'
+        }
+        req = requests.get(url)
+        r = (True, req)
     except Exception as e:
         r = (False, e)
     if r[0] and r[1].status_code != 404:
